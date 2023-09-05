@@ -11,13 +11,13 @@ config = ConfigParser()
 config.read('config.ini')
 
 ser = serial.Serial(
-        "COM"+config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1,
+        config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1,
     )
 cache = {}
 cache['pushClicked'] = False
 
-def sanitize(data):
-    result = ""
+
+def sanitize(data, result=""):
     for char in data:
         if char.isdigit():
             result += char
@@ -66,7 +66,7 @@ def main(page: ft.Page):
     page.window_height = 200
     page.window_resizable = False
     page.fonts = {
-        "Digital 7": "/fonts/digital-7.ttf"
+        "Digital 7": "https://www.1001fonts.com/download/font/digital-7.regular.ttf"
     }
     weight_view = ft.Text(
         str(0),
@@ -87,4 +87,4 @@ def main(page: ft.Page):
         if data:
             cache["data"] = sanitize(data)
 
-ft.app(main, assets_dir="assets", name="Wegiht Reader")
+ft.app(main, assets_dir="assets", name="Weight Reader")
