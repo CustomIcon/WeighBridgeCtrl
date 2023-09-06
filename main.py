@@ -13,8 +13,7 @@ config.read('config.ini')
 ser = serial.Serial(
         config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1,
     )
-cache = {}
-cache['pushClicked'] = False
+cache = {'pushClicked': False}
 
 
 def sanitize(data, result=""):
@@ -37,9 +36,9 @@ def main(page: ft.Page):
             content=ft.Text("Data already pushed!"),
             action="Ok",
         )
-        if cache['pushClicked']:
+        if cache['pushClicked'] or weight_view.value == "0":
             page.snack_bar.open = True
-            page.update()
+            return page.update()
         cache['pushClicked'] = True
         urllib.request.urlopen(
             urllib.request.Request(
@@ -49,6 +48,12 @@ def main(page: ft.Page):
         ).read()
     def copyClick(e):
         e.page.set_clipboard(weight_view.value)
+        page.snack_bar = ft.SnackBar(
+            content=ft.Text(f"`{weight_view.value}`copied"),
+            action="Ok",
+        )
+        page.snack_bar.open = True
+        return page.update()
     def Buttons():
         return [
             ft.Container(
