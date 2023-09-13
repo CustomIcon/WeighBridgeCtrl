@@ -4,6 +4,7 @@ import urllib.request
 from configparser import ConfigParser
 import contextlib
 from time import sleep
+import re
 
 __version__ = '0.1'
 
@@ -11,18 +12,16 @@ config = ConfigParser()
 config.read('config.ini')
 
 ser = serial.Serial(
-        config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1,
+        config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1, parity="N", stopbits=1
     )
 cache = {'pushClicked': False}
 
 
-def sanitize(data, result=""):
-    for char in data:
-        if char.isdigit():
-            result += char
-    if not result:
-        result = "0"
-    return str(result)
+def sanitize(in_bin, result=""):
+    with contextlib.suppress(IndexError):
+        bb = in_bin.decode(encoding="ascii", errors="ignore")
+        clean = re.findall(r"\d{8}", bb)
+        return clean[0][:-2]
 
 
 def main(page: ft.Page):
@@ -40,12 +39,14 @@ def main(page: ft.Page):
             page.snack_bar.open = True
             return page.update()
         cache['pushClicked'] = True
-        urllib.request.urlopen(
-            urllib.request.Request(
-                f"https://n8n.cubable.date/webhook/weigh-bridge?weight={weight_view.value}",
-                headers={'User-Agent': 'Mozilla/5.0'}
-            )
-        ).read()
+        # urllib.request.urlopen(
+        #     urllib.request.Request(
+        #         f"https://n8n.cubable.date/webhook/weigh-bridge?weight={weight_view.value}",
+        #         headers={'User-Agent': 'Mozilla/5.0'}
+        #     )
+        # ).read()
+        with open("Z:\WeighBridgeTest\weight.txt", "w") as f:
+            f.write(weight_view.value)
     def copyClick(e):
         e.page.set_clipboard(weight_view.value)
         page.snack_bar = ft.SnackBar(
@@ -87,9 +88,12 @@ def main(page: ft.Page):
         weight_view,
     )
     while True:
-        sleep(0.5)
-        data = ser.readline().decode().strip()
+        # sleep(0.5)
+        data = ser.read_all()
         if data:
+            sleep(0.5)
             cache["data"] = sanitize(data)
+            weight_view.value = cache["data"]
+            page.update()
 
 ft.app(main, assets_dir="assets", name="Weight Reader")
