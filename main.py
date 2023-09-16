@@ -12,8 +12,8 @@ config = ConfigParser()
 config.read('config.ini')
 
 ser = serial.Serial(
-        config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1, parity="N", stopbits=1
-    )
+    config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1, parity="N", stopbits=1
+)
 cache = {'pushClicked': False}
 
 
@@ -25,11 +25,6 @@ def sanitize(in_bin, result=""):
 
 
 def main(page: ft.Page):
-    def readClick(e):
-        with contextlib.suppress(KeyError):
-            weight_view.value = cache["data"]
-        cache['pushClicked'] = False
-        page.update()
     def pushClick(e):
         page.snack_bar = ft.SnackBar(
             content=ft.Text("Data already pushed!"),
@@ -45,8 +40,6 @@ def main(page: ft.Page):
         #         headers={'User-Agent': 'Mozilla/5.0'}
         #     )
         # ).read()
-        with open("Z:\WeighBridgeTest\weight.txt", "w") as f:
-            f.write(weight_view.value)
     def copyClick(e):
         e.page.set_clipboard(weight_view.value)
         page.snack_bar = ft.SnackBar(
@@ -57,9 +50,6 @@ def main(page: ft.Page):
         return page.update()
     def Buttons():
         return [
-            ft.Container(
-                content=ft.ElevatedButton("Read", on_click=readClick)
-            ),
             ft.Container(
                 content=ft.ElevatedButton("Push", on_click=pushClick)
             ),
@@ -88,12 +78,12 @@ def main(page: ft.Page):
         weight_view,
     )
     while True:
-        # sleep(0.5)
         data = ser.read_all()
         if data:
             sleep(0.5)
-            cache["data"] = sanitize(data)
-            weight_view.value = cache["data"]
-            page.update()
+            cache['data'] = sanitize(data)
+            if cache['data'] != weight_view.value:
+                weight_view.value = sanitize(data)
+                page.update()
 
 ft.app(main, assets_dir="assets", name="Weight Reader")
