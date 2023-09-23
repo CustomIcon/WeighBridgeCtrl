@@ -2,12 +2,12 @@
 
 # Define variables for the command and arguments
 FLET_CMD := flet pack
-ICON := .\assets\favicon.ico
+ICON := assets/favicon.ico
 APP_NAME := WBC
 PRODUCT_NAME := WBC
 FILE_VERSION := 0.1
 COMPANY_NAME := WAMCO
-MAIN_PY := .\main.py
+MAIN_PY := main.py
 
 # Define the target to build the application
 build:
