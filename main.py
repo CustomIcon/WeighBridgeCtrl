@@ -14,7 +14,6 @@ __version__ = '0.1'
 # importing config.ini file
 config = ConfigParser()
 config.read('config.ini')
-
 # getting USB serial connection established
 ser = serial.Serial(
     config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1, parity='N', stopbits=1,
@@ -26,12 +25,6 @@ cache = {'pushClicked': False, 'tag': '000000000'}
 
 
 def main(page: ft.Page):
-    #     urllib.request.urlopen(
-    #         urllib.request.Request(
-    #             f"https://n8n.cubable.date/webhook/weigh-bridge?weight={weight_value.value}",
-    #             headers={'User-Agent': 'Mozilla/5.0'}
-    #         )
-    #     ).read()
     # status changer
     def status(value: str, reason: None = ''):
         if value == 'busy':
@@ -222,54 +215,63 @@ def main(page: ft.Page):
         ),
     )
     # a loop reading data coming from serial port
-    try:
-        for device in [evdev.InputDevice(fn) for fn in evdev.list_devices()]:
-            if device.name == 'Sycreader USB Reader':
-                device = evdev.InputDevice(device.path)
-                container = []
-                device.grab()
-                for event in device.read_loop():
-                    data = ser.read_all()
-                    if data:
-                        cache['data'] = utils.sanitize(data)
-                        if cache['data'] != weight_value.value:
-                            weight_value.value = utils.sanitize(data)
-                    if event.type == evdev.ecodes.EV_KEY and event.value == 1:
-                        digit = evdev.ecodes.KEY[event.code]
-                        if digit == 'KEY_ENTER':
-                            status('busy')
-                            tag = ''.join(i.strip('KEY_') for i in container)
-                            customer_value.value = tag
-                            date_value.value, time_value.value = utils.time_now()
-                            container = []
-                            page.update()
-                            # HAHAHA CAUGHT IN 4K
-                            try:
-                                utils.camera_snapshot(
-                                    ip=config.get('settings', 'cam_ip'),
-                                    port=config.get('settings', 'cam_port'),
-                                    username=config.get(
-                                        'settings', 'cam_username',
-                                    ),
-                                    password=config.get(
-                                        'settings', 'cam_password',
-                                    ),
-                                    filename=customer_value.value,
-                                )
-                                status('ready')
-                            except subprocess.CalledProcessError as e:
-                                subprocess.run(
-                                    ['mkdir', 'snapshots'], check=False,
-                                )
-                                status(
-                                    'error', reason='Something went wrong, please try again',
-                                )
-                            # webhook implementation
-                            sleep(0.5)
-                        else:
-                            container.append(digit)
-    except KeyboardInterrupt:
-        quit()
+    for device in [evdev.InputDevice(fn) for fn in evdev.list_devices()]:
+        if device.name == 'Sycreader USB Reader':
+            device = evdev.InputDevice(device.path)
+            container = []
+            device.grab()
+            for event in device.read_loop():
+                data = ser.read_all()
+                if data:
+                    cache['data'] = utils.sanitize(data)
+                    if cache['data'] != weight_value.value:
+                        weight_value.value = utils.sanitize(data)
+                if event.type == evdev.ecodes.EV_KEY and event.value == 1:
+                    digit = evdev.ecodes.KEY[event.code]
+                    if digit == 'KEY_ENTER':
+                        status('busy')
+                        tag = ''.join(i.strip('KEY_') for i in container)
+                        customer_value.value = tag
+                        date_value.value, time_value.value = utils.time_now()
+                        container = []
+                        page.update()
+                        # HAHAHA CAUGHT IN 4K
+                        try:
+                            utils.camera_snapshot(
+                                ip=config.get('settings', 'cam_ip'),
+                                port=config.get('settings', 'cam_port'),
+                                username=config.get(
+                                    'settings', 'cam_username',
+                                ),
+                                password=config.get(
+                                    'settings', 'cam_password',
+                                ),
+                                filename=customer_value.value,
+                            )
+                        except subprocess.CalledProcessError as e:
+                            subprocess.run(
+                                ['mkdir', 'snapshots'], check=False,
+                            )
+                            status(
+                                'error', reason='Something went wrong, please try again',
+                            )
+                        # webhook implementation
+                        urllib.request.urlopen(
+                            urllib.request.Request(
+                                config.get('settings', 'webhook').format(
+                                    weight_value.value,
+                                    customer_value.value,
+                                    date_value.value,
+                                    time_value.value,
+                                ),
+                                headers={'User-Agent': 'Mozilla/5.0'},
+                            ),
+                        ).read()
+
+                        status('ready')
+                        sleep(0.5)
+                    else:
+                        container.append(digit)
 
 
 # RUN IT BACK

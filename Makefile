@@ -12,4 +12,5 @@ MAIN_PY := main.py
 
 # Define the target to build the application
 build:
+	pre-commit run --all-files
 	$(FLET_CMD) --icon $(ICON) -n $(APP_NAME) --product-name $(PRODUCT_NAME) --add-data "$(ASSETS_DIR)" --file-version $(FILE_VERSION) --company-name $(COMPANY_NAME) $(MAIN_PY)
