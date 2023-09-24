@@ -3,9 +3,10 @@ import serial
 import urllib.request
 from configparser import ConfigParser
 import contextlib
-import sys
 from time import sleep
 import re
+import evdev
+import datetime
 
 # version tag
 __version__ = '0.1'
@@ -20,7 +21,8 @@ ser = serial.Serial(
     config.get('settings', 'COM'), baudrate=config.getint('settings', 'baud'), timeout=1, parity="N", stopbits=1
 )
 # memory cache
-cache = {'pushClicked': False}
+cache = {'pushClicked': False, 'tag': "000000000"}
+
 
 # sanatize read data from USB serial port to the application
 def sanitize(in_bin, result=""):
@@ -30,7 +32,6 @@ def sanitize(in_bin, result=""):
         return clean[0][:-2]
 
 
-# main page
 def main(page: ft.Page):
     #     urllib.request.urlopen(
     #         urllib.request.Request(
@@ -38,7 +39,6 @@ def main(page: ft.Page):
     #             headers={'User-Agent': 'Mozilla/5.0'}
     #         )
     #     ).read()
-    
     # status changer
     def status(value: str):
         if value == "busy":
@@ -69,7 +69,17 @@ def main(page: ft.Page):
         font_family="Digital 7",
     )
     customer_value = ft.Text(
-        "",
+        cache['tag'],
+        size=100,
+        font_family="Digital 7",
+    )
+    price_value = ft.Text(
+        "0000.00",
+        size=100,
+        font_family="Digital 7",
+    )
+    datetime_value = ft.Text(
+        "00-00-0000 00:00",
         size=100,
         font_family="Digital 7",
     )
@@ -105,19 +115,56 @@ def main(page: ft.Page):
                     customer_value
                 ]
         ),
+        ft.Row(
+                controls=[
+                    ft.Text(
+                        "DATETIME: ",
+                        size=100,
+                        font_family="Digital 7",
+                    ),
+                    datetime_value
+                ]
+        ),
+        ft.Row(
+                controls=[
+                    ft.Text(
+                        "PRICE: ",
+                        size=100,
+                        font_family="Digital 7",
+                    ),
+                    price_value
+                ]
+        ),
     )
     # a loop reading data coming from serial port
-    while True:
-        data = ser.read_all()
-        if data:
-            sleep(0.5)
-            cache['data'] = sanitize(data)
-            if cache['data'] != weight_value.value:
-                weight_value.value = sanitize(data)
-                page.update()
-        for line in sys.stdin:
-            customer_value.value = line.strip()
-            page.update()
-
+    try:
+        for device in [evdev.InputDevice(fn) for fn in evdev.list_devices()]:
+            if device.name == "Sycreader USB Reader":
+                device = evdev.InputDevice(device.path)
+                container = []
+                device.grab()
+                for event in device.read_loop():
+                    data = ser.read_all()
+                    if data:
+                        cache['data'] = sanitize(data)
+                        if cache['data'] != weight_value.value:
+                            weight_value.value = sanitize(data)
+                    if event.type == evdev.ecodes.EV_KEY and event.value == 1:
+                        digit = evdev.ecodes.KEY[event.code]
+                        if digit == 'KEY_ENTER':
+                            status("busy")
+                            # create and dump the tag
+                            tag = "".join(i.strip('KEY_') for i in container)
+                            customer_value.value = tag
+                            current_datetime = datetime.datetime.now()
+                            datetime_value.value = current_datetime.strftime("%d-%m-%Y %H:%M:%S")
+                            container = []
+                            page.update()
+                            sleep(0.7)
+                        else:
+                            container.append(digit)
+                    status("ready")
+    except KeyboardInterrupt:
+        quit()
 # RUN IT BACK
 ft.app(main, assets_dir="assets", name="Weight Reader")
