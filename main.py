@@ -2,11 +2,10 @@ import flet as ft
 import serial
 import urllib.request
 from configparser import ConfigParser
-import contextlib
 from time import sleep
-import re
+from helpers import utils
+import subprocess
 import evdev
-import datetime
 
 # version tag
 __version__ = '0.1'
@@ -26,13 +25,6 @@ cache = {'pushClicked': False, 'tag': '000000000'}
 # sanatize read data from USB serial port to the application
 
 
-def sanitize(in_bin, result=''):
-    with contextlib.suppress(IndexError):
-        bb = in_bin.decode(encoding='ascii', errors='ignore')
-        clean = re.findall(r'\d{8}', bb)
-        return clean[0][:-2]
-
-
 def main(page: ft.Page):
     #     urllib.request.urlopen(
     #         urllib.request.Request(
@@ -41,13 +33,13 @@ def main(page: ft.Page):
     #         )
     #     ).read()
     # status changer
-    def status(value: str):
+    def status(value: str, reason: None = ''):
         if value == 'busy':
             status_icon.src = 'icons/yellow.png'
             status_value.value = 'PROCESSING'
         elif value == 'error':
             status_icon.src = 'icons/red.png'
-            status_value.value = 'Error. restarting in 5 seconds'
+            status_value.value = f'Error. {reason}'
         else:
             status_icon.src = 'icons/green.png'
             status_value.value = 'ready'
@@ -66,22 +58,42 @@ def main(page: ft.Page):
     status_icon = ft.Image(src='icons/green.png')
     weight_value = ft.Text(
         str(0),
-        size=100,
+        size=120,
         font_family='Digital 7',
     )
     customer_value = ft.Text(
         cache['tag'],
-        size=100,
+        size=120,
         font_family='Digital 7',
     )
     price_value = ft.Text(
         '0000.00',
-        size=100,
+        size=120,
         font_family='Digital 7',
     )
-    datetime_value = ft.Text(
-        '00-00-0000 00:00',
-        size=100,
+    date_value = ft.Text(
+        '00-00-0000',
+        size=120,
+        font_family='Digital 7',
+    )
+    time_value = ft.Text(
+        '00:00:00',
+        size=120,
+        font_family='Digital 7',
+    )
+    plate_value = ft.Text(
+        'A0000',
+        size=120,
+        font_family='Digital 7',
+    )
+    final_weight_value = ft.Text(
+        '0',
+        size=120,
+        font_family='Digital 7',
+    )
+    paid_value = ft.Text(
+        'UNKNOWN',
+        size=120,
         font_family='Digital 7',
     )
     page.appbar = ft.AppBar(
@@ -98,42 +110,114 @@ def main(page: ft.Page):
     page.add(
         ft.Row(
             controls=[
-                ft.Text(
-                    'WEIGHT: ',
-                    size=100,
-                    font_family='Digital 7',
+                ft.Column(
+                    controls=[
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'WEIGHT: ',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                weight_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'ID: ',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                customer_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'DATE: ',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                date_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'TIME: ',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                time_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'PRICE [MVR]: ',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                price_value,
+                            ],
+                        ),
+                    ],
                 ),
-                weight_value,
-            ],
-        ),
-        ft.Row(
-            controls=[
-                ft.Text(
-                    'CUSTOMER: ',
-                    size=100,
-                    font_family='Digital 7',
+                ft.Column(
+                    controls=[
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'PLATE NO.: ',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                plate_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'FINAL[KG]: ',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                final_weight_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    'PAID:',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                paid_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    '',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                # price_value,
+                            ],
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Text(
+                                    '',
+                                    size=120,
+                                    font_family='Digital 7',
+                                ),
+                                # price_value,
+                            ],
+                        ),
+                    ],
                 ),
-                customer_value,
-            ],
-        ),
-        ft.Row(
-            controls=[
-                ft.Text(
-                    'DATETIME: ',
-                    size=100,
-                    font_family='Digital 7',
-                ),
-                datetime_value,
-            ],
-        ),
-        ft.Row(
-            controls=[
-                ft.Text(
-                    'PRICE: ',
-                    size=100,
-                    font_family='Digital 7',
-                ),
-                price_value,
             ],
         ),
     )
@@ -147,26 +231,43 @@ def main(page: ft.Page):
                 for event in device.read_loop():
                     data = ser.read_all()
                     if data:
-                        cache['data'] = sanitize(data)
+                        cache['data'] = utils.sanitize(data)
                         if cache['data'] != weight_value.value:
-                            weight_value.value = sanitize(data)
+                            weight_value.value = utils.sanitize(data)
                     if event.type == evdev.ecodes.EV_KEY and event.value == 1:
                         digit = evdev.ecodes.KEY[event.code]
                         if digit == 'KEY_ENTER':
                             status('busy')
-                            # create and dump the tag
                             tag = ''.join(i.strip('KEY_') for i in container)
                             customer_value.value = tag
-                            current_datetime = datetime.datetime.now()
-                            datetime_value.value = current_datetime.strftime(
-                                '%d-%m-%Y %H:%M:%S',
-                            )
+                            date_value.value, time_value.value = utils.time_now()
                             container = []
                             page.update()
-                            sleep(0.7)
+                            # HAHAHA CAUGHT IN 4K
+                            try:
+                                utils.camera_snapshot(
+                                    ip=config.get('settings', 'cam_ip'),
+                                    port=config.get('settings', 'cam_port'),
+                                    username=config.get(
+                                        'settings', 'cam_username',
+                                    ),
+                                    password=config.get(
+                                        'settings', 'cam_password',
+                                    ),
+                                    filename=customer_value.value,
+                                )
+                                status('ready')
+                            except subprocess.CalledProcessError as e:
+                                subprocess.run(
+                                    ['mkdir', 'snapshots'], check=False,
+                                )
+                                status(
+                                    'error', reason='Something went wrong, please try again',
+                                )
+                            # webhook implementation
+                            sleep(0.5)
                         else:
                             container.append(digit)
-                    status('ready')
     except KeyboardInterrupt:
         quit()
 

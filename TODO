@@ -1,0 +1,4 @@
+- implement scp to server
+- implement api calls to webhook
+- test in a real scenario
+- test all functions with fail safe added
