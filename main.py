@@ -6,6 +6,7 @@ from helpers import utils
 import subprocess
 import evdev
 import threading
+import os
 
 # version tag
 __version__ = '0.1'
@@ -21,7 +22,15 @@ ser = serial.Serial(
 # memory cache
 cache = {'pushClicked': False, 'tag': '000000000'}
 
-# sanatize read data from USB serial port to the application
+
+# Check if the directory exists
+snapshots_directory = "snapshots"
+if not os.path.exists(snapshots_directory):
+    # If it doesn't exist, create it
+    os.makedirs(snapshots_directory)
+    print(f"Created directory: {snapshots_directory}")
+else:
+    print(f"Directory already exists: {snapshots_directory}")
 
 
 def WeighBridgeCtrl(page: ft.Page):
@@ -238,8 +247,11 @@ def WeighBridgeCtrl(page: ft.Page):
             container = []
             device.grab()
             while True:
-                data = ser.read_all()
-                event = device.read_one()
+                try:
+                    data = ser.read_all()
+                    event = device.read_one()
+                except OSError:
+                    return page.window_close()
                 if data:
                     status('busy')
                     weight_value.value = utils.sanitize(data)
@@ -267,20 +279,7 @@ def WeighBridgeCtrl(page: ft.Page):
                                 filename=customer_value.value,
                             )
                         except subprocess.CalledProcessError:
-                            subprocess.run(
-                                ['mkdir', 'snapshots'], check=False,
-                            )
-                            utils.camera_snapshot(
-                                ip=config.get('settings', 'cam_ip'),
-                                port=config.get('settings', 'cam_port'),
-                                username=config.get(
-                                    'settings', 'cam_username',
-                                ),
-                                password=config.get(
-                                    'settings', 'cam_password',
-                                ),
-                                filename=customer_value.value,
-                            )
+                            status('error', reason='cant take snapshot')
                         # webhook implementation
                         if weight_value.value not in ['000000', '']:
                             utils.call_api(

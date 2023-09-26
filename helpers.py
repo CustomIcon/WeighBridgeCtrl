@@ -34,6 +34,8 @@ class Utils:
             '--http-user=' + username,
             '--http-password=' + password,
             '--output-document=' + 'snapshots/'+filename+'.jpeg',
+            '--timeout=2',
+            '--tries=1',
             f'http://{ip}:{port}/jpg/1/image.jpg',
         ]
         return subprocess.run(wget_command, check=True)
