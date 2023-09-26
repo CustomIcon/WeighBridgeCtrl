@@ -1,16 +1,13 @@
 ## WeighBridgeCtrl
 This project is based on [COM-Watch](https://git.cubable.date/Stuff/COM-Watch) project which made initially
 
-### How does it work
-This program has a simple task
-- When staff clicks on "Read" it will get the current weight of the dump truck using Serial connection through COM port
-![Read](https://git.cubable.date/Stuff/WeighBridgeCtrl/raw/branch/main/assets/images/read.png)
-- By clicking on "Push" the data will be pushed to a webhook (This can be used to calculate the weight of waste minus the weight of dump truck to get accurate weight of the waste that has been transferred to the station or it can do more)
-![Push](https://git.cubable.date/Stuff/WeighBridgeCtrl/raw/branch/main/assets/images/push.png)
-- Pressing on "Copy" will copy the value of weight program got to the clipboard of the computer
-![Copy](https://git.cubable.date/Stuff/WeighBridgeCtrl/raw/branch/main/assets/images/copy.png)
-- Program is able to start automatically by putting a shortcut to the app inside [Startup Directory](https://support.microsoft.com/en-us/windows/add-an-app-to-run-automatically-at-startup-in-windows-10-150da165-dcd9-7230-517b-cf3c295d89dd) of Windows
-![AutoStart](https://git.cubable.date/Stuff/WeighBridgeCtrl/raw/branch/main/assets/images/auto-start.png)
+### Requirements
+- makes sure all hardware is attached properly
+- run these commands for the first time:
+    - to allow reading RFID device inputs and grabbing the device on lock:
+        `sudo chown $USER -R /dev/input/`
+    - to allow Weigh Bridge Unit to communicate with Pi on serial connection:
+        `sudo usermod -a -G tty $USER && sudo usermod -a -G dialout $USER && sudo usermod -a -G uucp $USER`
 ### Development
 - make sure you have python 3.7 and up
 - make a virtual environment and install requirements mentioned in `requirements.txt`

@@ -1,11 +1,11 @@
 import flet as ft
 import serial
-import urllib.request
 from configparser import ConfigParser
 from time import sleep
 from helpers import utils
 import subprocess
 import evdev
+import threading
 
 # version tag
 __version__ = '0.1'
@@ -24,7 +24,7 @@ cache = {'pushClicked': False, 'tag': '000000000'}
 # sanatize read data from USB serial port to the application
 
 
-def main(page: ft.Page):
+def WeighBridgeCtrl(page: ft.Page):
     # status changer
     def status(value: str, reason: None = ''):
         if value == 'busy':
@@ -37,12 +37,17 @@ def main(page: ft.Page):
             status_icon.src = 'icons/green.png'
             status_value.value = 'ready'
         page.update()
-
     # page preference
     page.window_full_screen = True
     page.fonts = {
         'Digital 7': 'https://www.1001fonts.com/download/font/digital-7.regular.ttf',
     }
+    stat_value = ft.Text(
+        '',
+        size=120,
+        font_family='Digital 7',
+        color=ft.colors.GREEN_500,
+    )
     status_value = ft.Text(
         'READY',
         size=30,
@@ -50,7 +55,7 @@ def main(page: ft.Page):
     )
     status_icon = ft.Image(src='icons/green.png')
     weight_value = ft.Text(
-        str(0),
+        '000000',
         size=120,
         font_family='Digital 7',
     )
@@ -100,6 +105,23 @@ def main(page: ft.Page):
             ),
         ],
     )
+
+    def clear_defaults():
+        while True:
+            sleep(15)
+            if weight_value.value == '000000':
+                customer_value.value = '000000000'
+                price_value.value = '0000.00'
+                date_value.value = '00-00-0000'
+                time_value.value = '00:00:00'
+                plate_value.value = 'A0000'
+                final_weight_value.value = '0'
+                paid_value.value = 'UNKNOWN'
+                stat_value.value = ''
+                status('ready')
+                page.update()
+    clear = threading.Thread(target=clear_defaults)
+    clear.start()
     page.add(
         ft.Row(
             controls=[
@@ -191,12 +213,7 @@ def main(page: ft.Page):
                         ),
                         ft.Row(
                             controls=[
-                                ft.Text(
-                                    '',
-                                    size=120,
-                                    font_family='Digital 7',
-                                ),
-                                # price_value,
+                                stat_value,
                             ],
                         ),
                         ft.Row(
@@ -220,18 +237,19 @@ def main(page: ft.Page):
             device = evdev.InputDevice(device.path)
             container = []
             device.grab()
-            for event in device.read_loop():
+            while True:
                 data = ser.read_all()
+                event = device.read_one()
                 if data:
-                    cache['data'] = utils.sanitize(data)
-                    if cache['data'] != weight_value.value:
-                        weight_value.value = utils.sanitize(data)
-                if event.type == evdev.ecodes.EV_KEY and event.value == 1:
+                    status('busy')
+                    weight_value.value = utils.sanitize(data)
+                    page.update()
+                if event and event.type == evdev.ecodes.EV_KEY and event.value == 1:
                     digit = evdev.ecodes.KEY[event.code]
                     if digit == 'KEY_ENTER':
-                        status('busy')
-                        tag = ''.join(i.strip('KEY_') for i in container)
-                        customer_value.value = tag
+                        customer_value.value = ''.join(
+                            i.strip('KEY_') for i in container
+                        )
                         date_value.value, time_value.value = utils.time_now()
                         container = []
                         page.update()
@@ -248,31 +266,38 @@ def main(page: ft.Page):
                                 ),
                                 filename=customer_value.value,
                             )
-                        except subprocess.CalledProcessError as e:
+                        except subprocess.CalledProcessError:
                             subprocess.run(
                                 ['mkdir', 'snapshots'], check=False,
                             )
-                            status(
-                                'error', reason='Something went wrong, please try again',
+                            utils.camera_snapshot(
+                                ip=config.get('settings', 'cam_ip'),
+                                port=config.get('settings', 'cam_port'),
+                                username=config.get(
+                                    'settings', 'cam_username',
+                                ),
+                                password=config.get(
+                                    'settings', 'cam_password',
+                                ),
+                                filename=customer_value.value,
                             )
                         # webhook implementation
-                        urllib.request.urlopen(
-                            urllib.request.Request(
-                                config.get('settings', 'webhook').format(
-                                    weight_value.value,
-                                    customer_value.value,
-                                    date_value.value,
-                                    time_value.value,
-                                ),
-                                headers={'User-Agent': 'Mozilla/5.0'},
-                            ),
-                        ).read()
-
-                        status('ready')
-                        sleep(0.5)
+                        if weight_value.value not in ['000000', '']:
+                            utils.call_api(
+                                endpoint=config.get('settings', 'webhook'),
+                                weight=weight_value.value,
+                                id=customer_value.value,
+                                date=date_value.value,
+                                time=time_value.value,
+                            )
+                            stat_value.value = 'SENT'
+                            status('ready')
+                            page.update()
                     else:
                         container.append(digit)
+        else:
+            page.window_close()
 
 
 # RUN IT BACK
-ft.app(main, assets_dir='assets', name='Weight Reader')
+ft.app(WeighBridgeCtrl, assets_dir='assets', name='Weight Reader')
