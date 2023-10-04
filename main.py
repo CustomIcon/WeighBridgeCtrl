@@ -37,13 +37,16 @@ def WeighBridgeCtrl(page: ft.Page):
     # status changer
     def status(value: str, reason: None = ''):
         if value == 'busy':
+            pb.visible = True
             status_icon.src = 'icons/yellow.png'
             status_value.value = 'PROCESSING'
         elif value == 'error':
+            pb.visible = True
             status_icon.src = 'icons/red.png'
             status_value.value = f'Error. {reason}'
         else:
             status_icon.src = 'icons/green.png'
+            pb.visible = False
             status_value.value = 'ready'
         page.update()
     # page preference
@@ -103,6 +106,7 @@ def WeighBridgeCtrl(page: ft.Page):
         size=120,
         font_family='Digital 7',
     )
+    pb = ft.ProgressBar(visible=False, height=50)
     page.appbar = ft.AppBar(
         leading=ft.Container(padding=5, content=status_icon),
         leading_width=40,
@@ -114,7 +118,6 @@ def WeighBridgeCtrl(page: ft.Page):
             ),
         ],
     )
-
     def clear_defaults():
         while True:
             sleep(15)
@@ -239,6 +242,7 @@ def WeighBridgeCtrl(page: ft.Page):
                 ),
             ],
         ),
+        pb,
     )
     # a loop reading data coming from serial port
     for device in [evdev.InputDevice(fn) for fn in evdev.list_devices()]:
@@ -288,8 +292,8 @@ def WeighBridgeCtrl(page: ft.Page):
                                 id=customer_value.value,
                                 date=date_value.value,
                                 time=time_value.value,
+                                stat_value=stat_value,
                             )
-                            stat_value.value = 'SENT'
                             status('ready')
                             page.update()
                     else:
