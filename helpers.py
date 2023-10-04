@@ -3,6 +3,7 @@ import re
 import datetime
 import subprocess
 import urllib.request
+import flet as ft
 
 
 class Utils:
@@ -47,18 +48,25 @@ class Utils:
         id: str,
         date: str,
         time: str,
+        stat_value
     ):
-        return urllib.request.urlopen(
-            urllib.request.Request(
-                endpoint.format(
-                    weight,
-                    id,
-                    date,
-                    time,
+        try:
+            stat_value.value = "SENT"
+            stat_value.color=ft.colors.GREEN_500
+            return urllib.request.urlopen(
+                urllib.request.Request(
+                    endpoint.format(
+                        weight,
+                        id,
+                        date,
+                        time,
+                    ),
+                    headers={'User-Agent': 'Mozilla/5.0'},
                 ),
-                headers={'User-Agent': 'Mozilla/5.0'},
-            ),
-        ).read()
+            ).read()
+        except urllib.error.URLError:
+            stat_value.color=ft.colors.RED_500
+            stat_value.value = "API ERROR"
 
 
 utils = Utils()
